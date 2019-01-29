@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Chataroo</title>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        #chat_box {
+            background: #fff;
+            color: #000;
+        }
+
+        #chat_box ul {
+            list-style-type: none;
+            padding: 10px;
+            height: 350px;
+            overflow-y: scroll;
+        }
+
+        #chat_box .username {
+            font-weight: bold;
+        }
+
+        #chat_box .room_event {
+            text-align: center;
+            font-style: italic;
+            background-color: #eee;
+        }
+    </style>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/js/bootstrap.min.js" charset="utf-8"></script>
+    <script>
+        const socket = io();
+
+        $(function () {
+            var username_field = document.getElementById('username');
+            var room_id = null;
+
+            $('#chat_card').hide();
+
+            $('#create_room').click(function(e){
+                e.preventDefault();
+                socket.emit('create_room');
+                return false;
+            });
+
+
+            $('#join_room').click(function (e) {
+                e.preventDefault();
+
+                var room_id = $('#join_room_id').val();
+                socket.emit('join_room', {
+                    room_id : room_id,
+                    username: username_field.value
+                });
+
+                $('#join_room_id').attr('disabled', true);
+                return false;
+            });
+
+
+            $('#leave_room').click(function (e) {
+                e.preventDefault();
+
+                var room_id = $('#join_room_id').val();
+                socket.emit('leave_room', {
+                    room_id : room_id,
+                    username: username_field.value
+                });
+
+                $('#join_room_id').attr('disabled', false);
+                $('#join_room_id').val('');
+                $('#room_id').text('');
+                $('#room_participants').text('');
+                $('#messages').text('');
+
+                return false;
+            });
+
+
+            $('form').submit(function(e){
+                e.preventDefault(); // prevents page reloading
+
+                var msg = $('#message').val();
+                var room_id = $('#join_room_id').val();
+
+                socket.emit('chat_message', {
+                    room_id: room_id,
+                    username: username_field.value,
+                    msg: msg
+                });
+
+                $('#message').val('');
+                return false;
+            });
+
+
+            socket.on('response', function(data) {
+                // Create room response handler
+                if (data.type === 'create_room') {
+
+                    if(data.status === 'success') {
+                        $('#join_room_id').val(data.data.room_id);
+                        $('#join_room_id').attr('disabled', true);
+                        $('#room_id').text(data.data.room_id);
+                        $('#room_participants').text('1');
+
+                        $('#room_manager_card').hide();
+                        $('#chat_card').show();
+                    }
+                }
+
+                if (data.type === 'leave_room') {
+
+                    if(data.status === 'success') {
+                        $('#join_room_id').attr('disabled', false);
+
+                        $('#room_manager_card').show();
+                        $('#chat_card').hide();
+                    }
+                }
+
+                if (data.type === 'join_room') {
+
+                    if(data.status === 'success') {
+                        $('#join_room_id').val(data.data.room_id);
+                        $('#join_room_id').attr('disabled', true);
+                        $('#room_id').text(data.data.room_id);
+                        $('#room_participants').text('1');
+
+                        $('#room_manager_card').hide();
+                        $('#chat_card').show();
+                    }
+                }
+
+            });
+
+
+            socket.on('room_event', function(data) {
+                if (data.type === 'joined') {
+                    $('#messages').append('<li class="room_event"><span>' + data.data.msg + '</span></li>');
+                }
+
+                if (data.type === 'left') {
+                    $('#messages').append('<li class="room_event"><span>' + data.data.msg + '</span></li>');
+                }
+            });
+
+
+            socket.on('chat_message', function(data) {
+                $('#messages').append('<li><span class="username">' + data.username + ':</span><span class="message"> ' + data.msg +' </span></li>');
+                $('#messages').animate({scrollTop: $('#messages').prop("scrollHeight")}, 500);
+            });
+
+        });
+    </script>
+</head>
+    <body>
+        <div class="container">
+            <div class="row">
+
+                <div id="room_manager_card" class="col-md-6 card mx-auto mt-5 p-4 text-white bg-dark">
+                    <h5 class="card-title mt-2">Chataroo</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">A simple socket.io room based chat.</h6>
+
+                    <div class="form-group mt-5">
+                        <label for="username">Username:</label>
+                        <input type="text" class="form-control" id="username" placeholder="Enter Username" autocomplete="off">
+                    </div>
+
+                    <hr class="mt-5" style="background-color: white;">
+
+                    <div class="form-group">
+                        <label for="join_room_id">Room ID:</label>
+                        <input type="text" class="form-control" id="join_room_id" placeholder="Enter Room ID">
+                        <small id="emailHelp" class="form-text text-muted">Get your room id from your host.</small>
+                    </div>
+                    <button id="join_room" class="btn btn-primary" type="button" name="button">Join Room</button>
+
+                    <span class="text-center my-3">Or</span>
+
+                    <button id="create_room" class="btn btn-primary" type="button" name="button"> Create Room </button>
+                </div>
+
+            </div>
+
+
+            <div class="row">
+
+                <div id="chat_card" class="col-md-6 card mx-auto mt-5 p-4 text-white bg-dark">
+                    <h5 class="card-title mt-2">Chataroo</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">A simple socket.io room based chat.</h6>
+
+                    <div class="d-flex justify-content-between mt-5">
+                        <div>
+                            <span class="d-block">
+                                Room ID: <span id="room_id"></span>
+                            </span>
+                            <span class="d-block">
+                                <i class="fa fa-users"></i> <span id="room_participants"></span>
+                            </span>
+                        </div>
+                        <div>
+                            <button id="leave_room" class="btn btn-danger" type="button" name="button">Leave</button>
+                        </div>
+                    </div>
+
+                    <div id="chat_box" class="mt-2">
+                        <ul id="messages">
+                            <!--  -->
+                        </ul>
+                    </div>
+
+                    <form class="form-row mt-2">
+                        <div class="form-group col-9">
+                            <input id="message" class="form-control" type="text" name="" placeholder="Enter message here" autocomplete="off">
+                        </div>
+
+                        <div class="form-group col-3">
+                            <button id="send" class="btn btn-primary btn-block">Send <i class="fa fa-paper-plane"></i></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
